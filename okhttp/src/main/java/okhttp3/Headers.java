@@ -314,13 +314,6 @@ public final class Headers {
         }
       }
       if (value == null) throw new NullPointerException("value == null");
-      for (int i = 0, length = value.length(); i < length; i++) {
-        char c = value.charAt(i);
-        if ((c <= '\u001f' && c != '\t') || c >= '\u007f') {
-          throw new IllegalArgumentException(Util.format(
-              "Unexpected char %#04x at %d in %s value: %s", (int) c, i, name, value));
-        }
-      }
     }
 
     /** Equivalent to {@code build().get(name)}, but potentially faster. */
