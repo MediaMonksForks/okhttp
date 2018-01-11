@@ -48,46 +48,50 @@ public final class BridgeInterceptor implements Interceptor {
     Request userRequest = chain.request();
     Request.Builder requestBuilder = userRequest.newBuilder();
 
-    RequestBody body = userRequest.body();
-    if (body != null) {
-      MediaType contentType = body.contentType();
-      if (contentType != null) {
-        requestBuilder.header("Content-Type", contentType.toString());
+    try {
+      RequestBody body = userRequest.body();
+      if (body != null) {
+        MediaType contentType = body.contentType();
+        if (contentType != null) {
+          requestBuilder.header("Content-Type", contentType.toString());
+        }
+
+        long contentLength = body.contentLength();
+        if (contentLength != -1) {
+          requestBuilder.header("Content-Length", Long.toString(contentLength));
+          requestBuilder.removeHeader("Transfer-Encoding");
+        } else {
+          requestBuilder.header("Transfer-Encoding", "chunked");
+          requestBuilder.removeHeader("Content-Length");
+        }
       }
 
-      long contentLength = body.contentLength();
-      if (contentLength != -1) {
-        requestBuilder.header("Content-Length", Long.toString(contentLength));
-        requestBuilder.removeHeader("Transfer-Encoding");
-      } else {
-        requestBuilder.header("Transfer-Encoding", "chunked");
-        requestBuilder.removeHeader("Content-Length");
+      if (userRequest.header("Host") == null) {
+        requestBuilder.header("Host", hostHeader(userRequest.url(), false));
       }
-    }
 
-    if (userRequest.header("Host") == null) {
-      requestBuilder.header("Host", hostHeader(userRequest.url(), false));
-    }
+      if (userRequest.header("Connection") == null) {
+        requestBuilder.header("Connection", "Keep-Alive");
+      }
 
-    if (userRequest.header("Connection") == null) {
-      requestBuilder.header("Connection", "Keep-Alive");
-    }
+      // If we add an "Accept-Encoding: gzip" header field we're responsible for also decompressing
+      // the transfer stream.
+      boolean transparentGzip = false;
+      if (userRequest.header("Accept-Encoding") == null && userRequest.header("Range") == null) {
+        transparentGzip = true;
+        requestBuilder.header("Accept-Encoding", "gzip");
+      }
 
-    // If we add an "Accept-Encoding: gzip" header field we're responsible for also decompressing
-    // the transfer stream.
-    boolean transparentGzip = false;
-    if (userRequest.header("Accept-Encoding") == null && userRequest.header("Range") == null) {
-      transparentGzip = true;
-      requestBuilder.header("Accept-Encoding", "gzip");
-    }
+      List<Cookie> cookies = cookieJar.loadForRequest(userRequest.url());
+      if (!cookies.isEmpty()) {
+        requestBuilder.header("Cookie", cookieHeader(cookies));
+      }
 
-    List<Cookie> cookies = cookieJar.loadForRequest(userRequest.url());
-    if (!cookies.isEmpty()) {
-      requestBuilder.header("Cookie", cookieHeader(cookies));
-    }
-
-    if (userRequest.header("User-Agent") == null) {
-      requestBuilder.header("User-Agent", Version.userAgent());
+      if (userRequest.header("User-Agent") == null) {
+        requestBuilder.header("User-Agent", Version.userAgent());
+      }
+    } catch (IllegalArgumentException exception) {
+      throw new IOException(exception.getMessage(), exception.getCause());
     }
 
     Response networkResponse = chain.proceed(requestBuilder.build());
