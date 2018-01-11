@@ -48,6 +48,8 @@ public final class BridgeInterceptor implements Interceptor {
     Request userRequest = chain.request();
     Request.Builder requestBuilder = userRequest.newBuilder();
 
+    boolean transparentGzip = false;
+
     try {
       RequestBody body = userRequest.body();
       if (body != null) {
@@ -76,7 +78,6 @@ public final class BridgeInterceptor implements Interceptor {
 
       // If we add an "Accept-Encoding: gzip" header field we're responsible for also decompressing
       // the transfer stream.
-      boolean transparentGzip = false;
       if (userRequest.header("Accept-Encoding") == null && userRequest.header("Range") == null) {
         transparentGzip = true;
         requestBuilder.header("Accept-Encoding", "gzip");
